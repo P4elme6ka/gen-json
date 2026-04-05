@@ -1,0 +1,8 @@
+{
+  "packageDir": ".",
+  "output": "zz_generated.genjson.go",
+  "types": ["User", "UserPlain"],
+  "features": ["unknown_fields", "required_fields"],
+  "emitMarshaler": true
+}
+
