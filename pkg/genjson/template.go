@@ -113,12 +113,8 @@ func Decode{{ .Name }}(data []byte) ({{ .Name }}, error) {
 			if err != nil {
 				return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
 			}
-			if u, ok := any(&out.{{ .GoName }}).(genjsonrt.TextUnmarshaler); ok {
-				if err := u.UnmarshalText(text); err != nil {
-					return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
-				}
-			} else {
-				return genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $type.Name }}, Field: {{ printf "%q" .GoName }}, Op: "decode"}
+			if err := out.{{ .GoName }}.UnmarshalText(text); err != nil {
+				return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
 			}
 			{{- else if eq .DecodeKind "ptr_uuid" }}
 			if genjsonrt.IsNull(value) {
@@ -129,14 +125,10 @@ func Decode{{ .Name }}(data []byte) ({{ .Name }}, error) {
 					return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
 				}
 				tmp := new({{ .BaseType }})
-				if u, ok := any(tmp).(genjsonrt.TextUnmarshaler); ok {
-					if err := u.UnmarshalText(text); err != nil {
-						return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
-					}
-					out.{{ .GoName }} = tmp
-				} else {
-					return genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $type.Name }}, Field: {{ printf "%q" .GoName }}, Op: "decode"}
+				if err := tmp.UnmarshalText(text); err != nil {
+					return fmt.Errorf("{{ $type.Name }}.{{ .GoName }}: %w", err)
 				}
+				out.{{ .GoName }} = tmp
 			}
 			{{- else if eq .DecodeKind "struct" }}
 			parsed, err := Decode{{ .BaseType }}(value)
@@ -201,12 +193,8 @@ func Decode{{ .Name }}(data []byte) ({{ .Name }}, error) {
 				txt, err := genjsonrt.DecodeText(elem)
 				if err != nil { return err }
 				var tmp {{ .ElemType }}
-				if u, ok := any(&tmp).(genjsonrt.TextUnmarshaler); ok {
-					if err := u.UnmarshalText(txt); err != nil { return err }
-					arr = append(arr, tmp)
-					return nil
-				}
-				return fmt.Errorf("unsupported slice elem")
+				if err := tmp.UnmarshalText(txt); err != nil { return err }
+				arr = append(arr, tmp)
 				{{- else if eq .ElemKind "struct" }}
 				vv, err := Decode{{ .ElemType }}(elem)
 				if err != nil { return err }
@@ -246,12 +234,8 @@ func Decode{{ .Name }}(data []byte) ({{ .Name }}, error) {
 				txt, err := genjsonrt.DecodeText(elem)
 				if err != nil { return err }
 				var tmp {{ .ElemType }}
-				if u, ok := any(&tmp).(genjsonrt.TextUnmarshaler); ok {
-					if err := u.UnmarshalText(txt); err != nil { return err }
-					m[k] = tmp
-					return nil
-				}
-				return fmt.Errorf("unsupported map elem")
+				if err := tmp.UnmarshalText(txt); err != nil { return err }
+				m[k] = tmp
 				{{- else if eq .ElemKind "struct" }}
 				vv, err := Decode{{ .ElemType }}(elem)
 				if err != nil { return err }
@@ -378,26 +362,20 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 			out = tmp
 		}
 		{{- else if eq .DecodeKind "uuid" }}
-		if tm, ok := any(v.{{ .GoName }}).(genjsonrt.TextMarshaler); ok {
-			text, err := tm.MarshalText()
-			if err != nil {
-				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-			}
-			out = strconv.AppendQuote(out, string(text))
-		} else {
-			return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+		text, err := v.{{ .GoName }}.MarshalText()
+		if err != nil {
+			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 		}
+		out = strconv.AppendQuote(out, string(text))
 		{{- else if eq .DecodeKind "ptr_uuid" }}
 		if v.{{ .GoName }} == nil {
 			out = append(out, "null"...)
-		} else if tm, ok := any(*v.{{ .GoName }}).(genjsonrt.TextMarshaler); ok {
-			text, err := tm.MarshalText()
+		} else {
+			text, err := v.{{ .GoName }}.MarshalText()
 			if err != nil {
 				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 			}
 			out = strconv.AppendQuote(out, string(text))
-		} else {
-			return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
 		}
 		{{- else if eq .DecodeKind "struct" }}
 		b, err := Encode{{ .BaseType }}(v.{{ .GoName }})
@@ -423,15 +401,11 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 		for i := range v.{{ .GoName }} {
 			out = genjsonrt.AppendCommaIfNeeded(out, &innerAny)
 			{{- if eq .ElemKind "uuid" }}
-			if tm, ok := any(v.{{ .GoName }}[i]).(genjsonrt.TextMarshaler); ok {
-				text, err := tm.MarshalText()
-				if err != nil {
-					return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-				}
-				out = strconv.AppendQuote(out, string(text))
-			} else {
-				return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+			text, err := v.{{ .GoName }}[i].MarshalText()
+			if err != nil {
+				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 			}
+			out = strconv.AppendQuote(out, string(text))
 			{{- else if eq .ElemKind "struct" }}
 			b, err := Encode{{ .ElemType }}(v.{{ .GoName }}[i])
 			if err != nil {
@@ -457,15 +431,11 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 			out = strconv.AppendQuote(out, k)
 			out = append(out, ':')
 			{{- if eq .ElemKind "uuid" }}
-			if tm, ok := any(vv).(genjsonrt.TextMarshaler); ok {
-				text, err := tm.MarshalText()
-				if err != nil {
-					return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-				}
-				out = strconv.AppendQuote(out, string(text))
-			} else {
-				return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+			text, err := vv.MarshalText()
+			if err != nil {
+				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 			}
+			out = strconv.AppendQuote(out, string(text))
 			{{- else if eq .ElemKind "struct" }}
 			b, err := Encode{{ .ElemType }}(vv)
 			if err != nil {
@@ -566,26 +536,20 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 		out = tmp
 	}
 	{{- else if eq .DecodeKind "uuid" }}
-	if tm, ok := any(v.{{ .GoName }}).(genjsonrt.TextMarshaler); ok {
-		text, err := tm.MarshalText()
+		text, err := v.{{ .GoName }}.MarshalText()
 		if err != nil {
 			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 		}
 		out = strconv.AppendQuote(out, string(text))
-	} else {
-		return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
-	}
 	{{- else if eq .DecodeKind "ptr_uuid" }}
 	if v.{{ .GoName }} == nil {
 		out = append(out, "null"...)
-	} else if tm, ok := any(*v.{{ .GoName }}).(genjsonrt.TextMarshaler); ok {
-		text, err := tm.MarshalText()
-		if err != nil {
-			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-		}
-		out = strconv.AppendQuote(out, string(text))
 	} else {
-		return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+			text, err := v.{{ .GoName }}.MarshalText()
+			if err != nil {
+				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
+			}
+			out = strconv.AppendQuote(out, string(text))
 	}
 {{- else if eq .DecodeKind "struct" }}
 	b, err := Encode{{ .BaseType }}(v.{{ .GoName }})
@@ -611,15 +575,11 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 	for i := range v.{{ .GoName }} {
 		out = genjsonrt.AppendCommaIfNeeded(out, &innerAny{{ .GoName }})
 		{{- if eq .ElemKind "uuid" }}
-		if tm, ok := any(v.{{ .GoName }}[i]).(genjsonrt.TextMarshaler); ok {
-			text, err := tm.MarshalText()
-			if err != nil {
-				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-			}
-			out = strconv.AppendQuote(out, string(text))
-		} else {
-			return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+		text, err := v.{{ .GoName }}[i].MarshalText()
+		if err != nil {
+			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 		}
+		out = strconv.AppendQuote(out, string(text))
 		{{- else if eq .ElemKind "struct" }}
 		b, err := Encode{{ .ElemType }}(v.{{ .GoName }}[i])
 		if err != nil {
@@ -645,15 +605,11 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 		out = strconv.AppendQuote(out, k)
 		out = append(out, ':')
 		{{- if eq .ElemKind "uuid" }}
-		if tm, ok := any(vv).(genjsonrt.TextMarshaler); ok {
-			text, err := tm.MarshalText()
-			if err != nil {
-				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-			}
-			out = strconv.AppendQuote(out, string(text))
-		} else {
-			return nil, genjsonrt.UnsupportedFieldTypeError{TypeName: {{ printf "%q" $typeName }}, Field: {{ printf "%q" .GoName }}, Op: "encode"}
+		text, err := vv.MarshalText()
+		if err != nil {
+			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 		}
+		out = strconv.AppendQuote(out, string(text))
 		{{- else if eq .ElemKind "struct" }}
 		b, err := Encode{{ .ElemType }}(vv)
 		if err != nil {

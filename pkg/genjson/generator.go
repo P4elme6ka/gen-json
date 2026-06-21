@@ -152,7 +152,11 @@ type renderField struct {
 }
 
 func fieldUsesUUID(f renderField) bool {
-	return f.BaseType == "uuid.UUID" || f.ElemType == "uuid.UUID"
+	// ptr_uuid decode emits: tmp := new(uuid.UUID)  — needs the import.
+	// slice/map with uuid elements emit: var tmp uuid.UUID / []uuid.UUID / map[string]uuid.UUID — needs the import.
+	// A plain scalar uuid.UUID field only calls .UnmarshalText / .MarshalText and never
+	// references the uuid package by name, so it does NOT need the import.
+	return f.DecodeKind == "ptr_uuid" || f.ElemKind == "uuid"
 }
 
 func buildReport(pkgName string, types []typeSpec, cfg Config) Report {

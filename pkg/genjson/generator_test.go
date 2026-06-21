@@ -8,6 +8,48 @@ import (
 	"testing"
 )
 
+// TestScalarUUIDNoImport verifies that a struct with only a plain uuid.UUID field
+// (no pointer, no slice, no map) does NOT emit a uuid import in the generated file,
+// because the direct-call path never references uuid.UUID as a type.
+func TestScalarUUIDNoImport(t *testing.T) {
+	tmp := t.TempDir()
+	repoRoot := filepath.Clean(filepath.Join(mustWD(t), "..", ".."))
+	mustWrite(t, filepath.Join(tmp, "go.mod"), "module example.com/scalar_uuid\n\ngo 1.26\n\nrequire github.com/P4elme6ka/gen-json v0.0.0\n\nreplace github.com/P4elme6ka/gen-json => "+repoRoot+"\n")
+	mustWrite(t, filepath.Join(tmp, "model.go"), `package scalar_uuid
+
+import "github.com/google/uuid"
+
+type Event struct {
+	ID uuid.UUID `+"`json:\"id\"`"+`
+}
+`)
+	cfg := Config{
+		PackageDir: tmp,
+		Output:     filepath.Join(tmp, "zz_generated.genjson.go"),
+		Types:      []string{"Event"},
+	}
+	code, err := Generate(cfg)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if strings.Contains(string(code), `"github.com/google/uuid"`) {
+		t.Fatalf("generated code has an unused uuid import for a scalar uuid.UUID field")
+	}
+	mustWrite(t, cfg.Output, string(code))
+	get := exec.Command("go", "get", "github.com/google/uuid@v1.6.0")
+	get.Dir = tmp
+	get.Env = append(os.Environ(), "GOWORK=off")
+	if out, err := get.CombinedOutput(); err != nil {
+		t.Fatalf("go get uuid failed: %v\n%s", err, out)
+	}
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = tmp
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed (likely unused import): %v\n%s", err, out)
+	}
+}
+
 func TestGenerateAndCompile(t *testing.T) {
 	tmp := t.TempDir()
 	repoRoot := filepath.Clean(filepath.Join(mustWD(t), "..", ".."))
