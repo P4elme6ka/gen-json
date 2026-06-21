@@ -10,9 +10,12 @@ import (
 
 func TestGenerateAndCompile(t *testing.T) {
 	tmp := t.TempDir()
+	repoRoot := filepath.Clean(filepath.Join(mustWD(t), "..", ".."))
 
-	mustWrite(t, filepath.Join(tmp, "go.mod"), "module example.com/tmp\n\ngo 1.26\n")
+	mustWrite(t, filepath.Join(tmp, "go.mod"), "module example.com/tmp\n\ngo 1.26\n\nrequire github.com/P4elme6ka/gen-json v0.0.0\n\nreplace github.com/P4elme6ka/gen-json => "+repoRoot+"\n")
 	mustWrite(t, filepath.Join(tmp, "model.go"), `package sample
+
+import "github.com/google/uuid"
 
 type Fancy string
 
@@ -22,12 +25,17 @@ type User struct {
 	Email string `+"`json:\"email,omitempty\"`"+`
 	Nick  Fancy  `+"`json:\"nick,omitempty\"`"+`
 }
+
+type Team struct {
+	IDs    []uuid.UUID            `+"`json:\"ids\"`"+`
+	Lookup map[string]uuid.UUID   `+"`json:\"lookup\"`"+`
+}
 `)
 
 	cfg := Config{
 		PackageDir:    tmp,
 		Output:        filepath.Join(tmp, "zz_generated.genjson.go"),
-		Types:         []string{"User"},
+		Types:         []string{"User", "Team"},
 		Features:      []string{FeatureUnknownFields, FeatureRequiredFields},
 		EmitMarshaler: true,
 	}
@@ -41,6 +49,12 @@ type User struct {
 	}
 	if !strings.Contains(string(code), "UnknownFieldError") {
 		t.Fatalf("generated code misses UnknownFieldError")
+	}
+	if !strings.Contains(string(code), "github.com/google/uuid") {
+		t.Fatalf("generated code misses uuid import for nested UUID fields")
+	}
+	if !strings.Contains(string(code), "github.com/P4elme6ka/gen-json/pkg/genjson/runtime") {
+		t.Fatalf("generated code misses runtime helper import")
 	}
 	if !strings.Contains(string(code), "func (v User) MarshalJSON") {
 		t.Fatalf("generated code misses MarshalJSON implementation")
@@ -62,6 +76,15 @@ type User struct {
 	if err != nil {
 		t.Fatalf("go test failed: %v\n%s", err, out)
 	}
+}
+
+func mustWD(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd(): %v", err)
+	}
+	return wd
 }
 
 func mustWrite(t *testing.T, path, content string) {

@@ -108,7 +108,7 @@ func render(pkgName string, types []typeSpec, cfg Config) ([]byte, error) {
 				ElemType:   elemType,
 			}
 			rt.Fields = append(rt.Fields, rf)
-			if rf.DecodeKind == "uuid" || rf.DecodeKind == "ptr_uuid" {
+			if fieldUsesUUID(rf) {
 				data.UsesUUID = true
 			}
 			if rf.Required {
@@ -149,6 +149,10 @@ type renderField struct {
 	BaseType   string
 	ElemKind   string
 	ElemType   string
+}
+
+func fieldUsesUUID(f renderField) bool {
+	return f.BaseType == "uuid.UUID" || f.ElemType == "uuid.UUID"
 }
 
 func buildReport(pkgName string, types []typeSpec, cfg Config) Report {
