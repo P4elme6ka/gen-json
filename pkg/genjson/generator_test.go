@@ -8,6 +8,46 @@ import (
 	"testing"
 )
 
+// TestTwoUUIDFieldsCompile verifies that a struct with two plain uuid.UUID fields
+// generates code that compiles without a "no new variables on left side of :=" error.
+func TestTwoUUIDFieldsCompile(t *testing.T) {
+	tmp := t.TempDir()
+	repoRoot := filepath.Clean(filepath.Join(mustWD(t), "..", ".."))
+	mustWrite(t, filepath.Join(tmp, "go.mod"), "module example.com/two_uuid\n\ngo 1.26\n\nrequire github.com/P4elme6ka/gen-json v0.0.0\n\nreplace github.com/P4elme6ka/gen-json => "+repoRoot+"\n")
+	mustWrite(t, filepath.Join(tmp, "model.go"), `package two_uuid
+
+import "github.com/google/uuid"
+
+type Request struct {
+	UserID     uuid.UUID `+"`json:\"user_id\"`"+`
+	ProviderID uuid.UUID `+"`json:\"provider_id\"`"+`
+}
+`)
+	cfg := Config{
+		PackageDir: tmp,
+		Output:     filepath.Join(tmp, "zz_generated.genjson.go"),
+		Types:      []string{"Request"},
+	}
+	code, err := Generate(cfg)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	mustWrite(t, cfg.Output, string(code))
+	env := append(os.Environ(), "GOWORK=off")
+	get := exec.Command("go", "get", "github.com/google/uuid@v1.6.0")
+	get.Dir = tmp
+	get.Env = env
+	if out, err := get.CombinedOutput(); err != nil {
+		t.Fatalf("go get uuid: %v\n%s", err, out)
+	}
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = tmp
+	cmd.Env = env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed (duplicate variable): %v\n%s", err, out)
+	}
+}
+
 // TestScalarUUIDNoImport verifies that a struct with only a plain uuid.UUID field
 // (no pointer, no slice, no map) does NOT emit a uuid import in the generated file,
 // because the direct-call path never references uuid.UUID as a type.

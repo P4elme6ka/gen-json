@@ -536,20 +536,22 @@ func Encode{{ .Name }}(v {{ .Name }}) ([]byte, error) {
 		out = tmp
 	}
 	{{- else if eq .DecodeKind "uuid" }}
+	{
 		text, err := v.{{ .GoName }}.MarshalText()
 		if err != nil {
 			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
 		}
 		out = strconv.AppendQuote(out, string(text))
+	}
 	{{- else if eq .DecodeKind "ptr_uuid" }}
 	if v.{{ .GoName }} == nil {
 		out = append(out, "null"...)
 	} else {
-			text, err := v.{{ .GoName }}.MarshalText()
-			if err != nil {
-				return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
-			}
-			out = strconv.AppendQuote(out, string(text))
+		text, err := v.{{ .GoName }}.MarshalText()
+		if err != nil {
+			return nil, fmt.Errorf("{{ $typeName }}.{{ .GoName }}: %w", err)
+		}
+		out = strconv.AppendQuote(out, string(text))
 	}
 {{- else if eq .DecodeKind "struct" }}
 	b, err := Encode{{ .BaseType }}(v.{{ .GoName }})
