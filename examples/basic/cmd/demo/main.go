@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"gen-json/examples/basic"
+	"github.com/P4elme6ka/gen-json/examples/basic"
 )
 
 func main() {

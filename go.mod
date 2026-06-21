@@ -1,4 +1,4 @@
-module gen-json
+module github.com/P4elme6ka/gen-json
 
 go 1.26
 

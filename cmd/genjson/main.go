@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"gen-json/pkg/genjson"
+	"github.com/P4elme6ka/gen-json/pkg/genjson"
 )
 
 func main() {

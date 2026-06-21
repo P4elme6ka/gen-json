@@ -13,7 +13,7 @@ The generated code:
 ## Install
 
 ```bash
-go install ./cmd/genjson
+go install github.com/P4elme6ka/gen-json/cmd/genjson@latest
 ```
 
 ## Quick start
@@ -88,7 +88,7 @@ Flags:
 You can use the generator programmatically via `pkg/genjson`:
 
 ```go
-import "gen-json/pkg/genjson"
+import "github.com/P4elme6ka/gen-json/pkg/genjson"
 
 cfg := genjson.Config{
 	PackageDir: ".",
